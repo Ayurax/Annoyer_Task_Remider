@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   createGroup,
   deleteGroup,
+  formatGroupLabel,
   getMyGroups,
   Group,
   joinGroup,
@@ -13,6 +14,7 @@ import { getDeviceId } from "../lib/deviceId";
 interface GroupJoinProps {
   activeGroupId: string | null;
   onActiveGroupChange: (groupId: string | null) => void;
+  onGroupsLoaded: (groups: Group[]) => void;
   onGroupsChanged: () => void;
   refreshKey: number;
 }
@@ -20,6 +22,7 @@ interface GroupJoinProps {
 export function GroupJoin({
   activeGroupId,
   onActiveGroupChange,
+  onGroupsLoaded,
   onGroupsChanged,
   refreshKey,
 }: GroupJoinProps) {
@@ -27,18 +30,13 @@ export function GroupJoin({
   const [currentDeviceId, setCurrentDeviceId] = useState<string | null>(null);
   const [newGroupName, setNewGroupName] = useState("");
   const [joinCode, setJoinCode] = useState("");
-  const [latestCreatedGroup, setLatestCreatedGroup] = useState<Group | null>(
-    null,
-  );
+  const [latestCreatedGroup, setLatestCreatedGroup] = useState<Group | null>(null);
   const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
-  const [createErrorMessage, setCreateErrorMessage] = useState<string | null>(
-    null,
-  );
+  const [createErrorMessage, setCreateErrorMessage] = useState<string | null>(null);
   const [joinErrorMessage, setJoinErrorMessage] = useState<string | null>(null);
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
-  const [confirmDeleteGroupId, setConfirmDeleteGroupId] = useState<
-    string | null
-  >(null);
+  const [confirmDeleteGroupId, setConfirmDeleteGroupId] = useState<string | null>(null);
+  const [newGroupNameError, setNewGroupNameError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
@@ -53,11 +51,9 @@ export function GroupJoin({
 
       setCurrentDeviceId(deviceId);
       setGroups(myGroups);
+      onGroupsLoaded(myGroups);
 
-      if (
-        activeGroupId &&
-        !myGroups.some((group) => group.id === activeGroupId)
-      ) {
+      if (activeGroupId && !myGroups.some((group) => group.id === activeGroupId)) {
         setActiveGroupId(null);
         onActiveGroupChange(null);
         setConfirmDeleteGroupId(null);
@@ -83,12 +79,21 @@ export function GroupJoin({
   async function handleCreateGroup() {
     setCreateErrorMessage(null);
     setCopyMessage(null);
+
+    const trimmedGroupName = newGroupName.trim();
+
+    if (!trimmedGroupName) {
+      setNewGroupNameError("Give your group a name.");
+      return;
+    }
+
     setIsCreating(true);
 
     try {
-      const group = await createGroup(newGroupName);
+      const group = await createGroup(trimmedGroupName);
       setLatestCreatedGroup(group);
       setNewGroupName("");
+      setNewGroupNameError(null);
       updateActiveGroup(group.id);
       await loadGroups();
       onGroupsChanged();
@@ -197,7 +202,7 @@ export function GroupJoin({
           <option value="">Personal (no group)</option>
           {groups.map((group) => (
             <option key={group.id} value={group.id}>
-              {group.name ? `${group.name} (${group.join_code})` : group.join_code}
+              {formatGroupLabel(group)}
             </option>
           ))}
         </select>
@@ -207,21 +212,31 @@ export function GroupJoin({
         <label className="field">
           <span className="field-label">New group name</span>
           <input
-            placeholder="Optional, e.g. My Devices"
+            placeholder="e.g. My Devices"
             type="text"
             value={newGroupName}
-            onChange={(event) => setNewGroupName(event.target.value)}
+            onChange={(event) => {
+              setNewGroupName(event.target.value);
+              if (newGroupNameError) {
+                setNewGroupNameError(null);
+              }
+            }}
           />
+          {newGroupNameError ? <p className="error-text">{newGroupNameError}</p> : null}
         </label>
         <div>
           <button disabled={isCreating} type="button" onClick={handleCreateGroup}>
             {isCreating ? "Creating..." : "Create new group"}
           </button>
         </div>
-        {createErrorMessage ? (
-          <p className="error-text">{createErrorMessage}</p>
-        ) : null}
+        {createErrorMessage ? <p className="error-text">{createErrorMessage}</p> : null}
       </div>
+
+      {!isLoading && groups.length === 0 ? (
+        <p className="muted-text">
+          You&apos;re not in any groups yet — create one or join with a code.
+        </p>
+      ) : null}
 
       {latestCreatedGroup ? (
         <div className="join-code-panel" aria-live="polite">
@@ -255,14 +270,10 @@ export function GroupJoin({
             </button>
           </div>
         </label>
-        {joinErrorMessage ? (
-          <p className="error-text">{joinErrorMessage}</p>
-        ) : null}
+        {joinErrorMessage ? <p className="error-text">{joinErrorMessage}</p> : null}
       </div>
 
-      {loadErrorMessage ? (
-        <p className="error-text">{loadErrorMessage}</p>
-      ) : null}
+      {loadErrorMessage ? <p className="error-text">{loadErrorMessage}</p> : null}
 
       {isLoading ? <p className="muted-text">Loading groups...</p> : null}
 

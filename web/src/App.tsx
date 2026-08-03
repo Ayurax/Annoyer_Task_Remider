@@ -5,6 +5,7 @@ import { GroupJoin } from "./components/GroupJoin";
 import { TaskList } from "./components/TaskList";
 import {
   getActiveGroupId,
+  Group,
   setActiveGroupId as persistActiveGroupId,
 } from "./lib/groups";
 
@@ -12,6 +13,7 @@ export function App() {
   const [activeGroupId, setActiveGroupIdState] = useState<string | null>(() =>
     getActiveGroupId(),
   );
+  const [joinedGroups, setJoinedGroups] = useState<Group[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
   const requestRefresh = () => setRefreshKey((key) => key + 1);
   const handleActiveGroupChange = (groupId: string | null) => {
@@ -34,10 +36,15 @@ export function App() {
           <GroupJoin
             activeGroupId={activeGroupId}
             onActiveGroupChange={handleActiveGroupChange}
+            onGroupsLoaded={setJoinedGroups}
             onGroupsChanged={requestRefresh}
             refreshKey={refreshKey}
           />
-          <AddTaskForm onTaskAdded={requestRefresh} />
+          <AddTaskForm
+            activeGroupId={activeGroupId}
+            joinedGroups={joinedGroups}
+            onTaskAdded={requestRefresh}
+          />
           <TaskList
             activeGroupId={activeGroupId}
             onActiveGroupMissing={() => handleActiveGroupChange(null)}

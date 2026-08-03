@@ -16,6 +16,10 @@ interface GroupMemberRow {
   groups: Group | Group[] | null;
 }
 
+export function formatGroupLabel(group: Pick<Group, "name" | "join_code">): string {
+  return group.name ? `${group.name} (${group.join_code})` : group.join_code;
+}
+
 function generateJoinCode(): string {
   return Array.from({ length: JOIN_CODE_LENGTH }, () => {
     const index = Math.floor(Math.random() * JOIN_CODE_CHARACTERS.length);
@@ -40,7 +44,7 @@ export async function createGroup(name?: string): Promise<Group> {
   const deviceId = await getDeviceId();
   const trimmedName = name?.trim();
 
-  for (let attempt = 0; attempt < 5; attempt += 1) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
     const joinCode = generateJoinCode();
     const { data, error } = await supabase
       .from("groups")
@@ -53,7 +57,7 @@ export async function createGroup(name?: string): Promise<Group> {
       .single();
 
     if (error) {
-      if (error.code === "23505") {
+      if (error.code === "23505" && attempt < 2) {
         continue;
       }
 
@@ -141,9 +145,38 @@ export async function leaveGroup(groupId: string): Promise<void> {
   if (error) {
     throw new Error(`Failed to leave group: ${error.message}`);
   }
+
+  const { count, error: countError } = await supabase
+    .from("group_members")
+    .select("group_id", { count: "exact", head: true })
+    .eq("group_id", groupId);
+
+  if (countError) {
+    throw new Error(`Failed to check group membership: ${countError.message}`);
+  }
+
+  if ((count ?? 0) === 0) {
+    await deleteGroup(groupId, { skipOwnershipCheck: true });
+  }
 }
 
-export async function deleteGroup(groupId: string): Promise<void> {
+async function deleteGroupRecord(groupId: string): Promise<void> {
+  const { error } = await supabase.from("groups").delete().eq("id", groupId);
+
+  if (error) {
+    throw new Error(`Failed to delete group: ${error.message}`);
+  }
+}
+
+export async function deleteGroup(
+  groupId: string,
+  options?: { skipOwnershipCheck?: boolean },
+): Promise<void> {
+  if (options?.skipOwnershipCheck) {
+    await deleteGroupRecord(groupId);
+    return;
+  }
+
   const deviceId = await getDeviceId();
   const { data: group, error: lookupError } = await supabase
     .from("groups")
@@ -163,9 +196,5 @@ export async function deleteGroup(groupId: string): Promise<void> {
     throw new Error("Only the group creator can delete this group.");
   }
 
-  const { error } = await supabase.from("groups").delete().eq("id", groupId);
-
-  if (error) {
-    throw new Error(`Failed to delete group: ${error.message}`);
-  }
+  await deleteGroupRecord(groupId);
 }

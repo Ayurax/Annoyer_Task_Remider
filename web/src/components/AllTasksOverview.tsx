@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { getDeviceId } from "../lib/deviceId";
-import { getMyGroups } from "../lib/groups";
+import { formatGroupLabel, getMyGroups } from "../lib/groups";
 import { supabase } from "../lib/supabaseClient";
 
 interface Task {
@@ -44,10 +44,7 @@ export function AllTasksOverview({
         const groups = await getMyGroups();
         const groupIds = groups.map((group) => group.id);
         const groupNameById = new Map(
-          groups.map((group) => [
-            group.id,
-            group.name || `Group ${group.join_code}`,
-          ]),
+          groups.map((group) => [group.id, formatGroupLabel(group)]),
         );
 
         const { data: personalTasks, error: personalError } = await supabase
