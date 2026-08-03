@@ -9,6 +9,7 @@ export interface Group {
   id: string;
   join_code: string;
   name: string | null;
+  created_by_device_id: string | null;
 }
 
 interface GroupMemberRow {
@@ -43,8 +44,12 @@ export async function createGroup(name?: string): Promise<Group> {
     const joinCode = generateJoinCode();
     const { data, error } = await supabase
       .from("groups")
-      .insert({ join_code: joinCode, name: trimmedName || null })
-      .select("id,join_code,name")
+      .insert({
+        created_by_device_id: deviceId,
+        join_code: joinCode,
+        name: trimmedName || null,
+      })
+      .select("id,join_code,name,created_by_device_id")
       .single();
 
     if (error) {
@@ -113,7 +118,7 @@ export async function getMyGroups(): Promise<Group[]> {
   const deviceId = await getDeviceId();
   const { data, error } = await supabase
     .from("group_members")
-    .select("groups(id,join_code,name)")
+    .select("groups(id,join_code,name,created_by_device_id)")
     .eq("device_id", deviceId);
 
   if (error) {
@@ -135,5 +140,32 @@ export async function leaveGroup(groupId: string): Promise<void> {
 
   if (error) {
     throw new Error(`Failed to leave group: ${error.message}`);
+  }
+}
+
+export async function deleteGroup(groupId: string): Promise<void> {
+  const deviceId = await getDeviceId();
+  const { data: group, error: lookupError } = await supabase
+    .from("groups")
+    .select("created_by_device_id")
+    .eq("id", groupId)
+    .maybeSingle();
+
+  if (lookupError) {
+    throw new Error(`Failed to check group ownership: ${lookupError.message}`);
+  }
+
+  if (!group) {
+    return;
+  }
+
+  if (group.created_by_device_id !== deviceId) {
+    throw new Error("Only the group creator can delete this group.");
+  }
+
+  const { error } = await supabase.from("groups").delete().eq("id", groupId);
+
+  if (error) {
+    throw new Error(`Failed to delete group: ${error.message}`);
   }
 }

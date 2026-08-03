@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getDeviceId } from "../lib/deviceId";
+import { getMyGroups } from "../lib/groups";
 import { supabase } from "../lib/supabaseClient";
 
 interface Task {
@@ -14,10 +15,17 @@ interface Task {
 
 interface TaskListProps {
   activeGroupId: string | null;
+  onActiveGroupMissing: () => void;
+  onTaskCompleted: () => void;
   refreshKey: number;
 }
 
-export function TaskList({ activeGroupId, refreshKey }: TaskListProps) {
+export function TaskList({
+  activeGroupId,
+  onActiveGroupMissing,
+  onTaskCompleted,
+  refreshKey,
+}: TaskListProps) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -39,6 +47,17 @@ export function TaskList({ activeGroupId, refreshKey }: TaskListProps) {
           .order("due_at", { ascending: true });
 
         if (activeGroupId) {
+          const groups = await getMyGroups();
+
+          if (!groups.some((group) => group.id === activeGroupId)) {
+            if (isCurrent) {
+              setTasks([]);
+              onActiveGroupMissing();
+            }
+
+            return;
+          }
+
           query = query.eq("group_id", activeGroupId);
         } else {
           const deviceId = await getDeviceId();
@@ -72,7 +91,7 @@ export function TaskList({ activeGroupId, refreshKey }: TaskListProps) {
     return () => {
       isCurrent = false;
     };
-  }, [activeGroupId, refreshKey]);
+  }, [activeGroupId, onActiveGroupMissing, refreshKey]);
 
   async function markDone(taskId: string) {
     setErrorMessage(null);
@@ -93,6 +112,7 @@ export function TaskList({ activeGroupId, refreshKey }: TaskListProps) {
     setTasks((currentTasks) =>
       currentTasks.filter((task) => task.id !== taskId),
     );
+    onTaskCompleted();
   }
 
   if (isLoading) {

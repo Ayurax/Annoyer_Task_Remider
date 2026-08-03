@@ -1,23 +1,30 @@
 import { useEffect, useState } from "react";
 import {
   createGroup,
+  deleteGroup,
   getMyGroups,
   Group,
   joinGroup,
   leaveGroup,
   setActiveGroupId,
 } from "../lib/groups";
+import { getDeviceId } from "../lib/deviceId";
 
 interface GroupJoinProps {
   activeGroupId: string | null;
   onActiveGroupChange: (groupId: string | null) => void;
+  onGroupsChanged: () => void;
+  refreshKey: number;
 }
 
 export function GroupJoin({
   activeGroupId,
   onActiveGroupChange,
+  onGroupsChanged,
+  refreshKey,
 }: GroupJoinProps) {
   const [groups, setGroups] = useState<Group[]>([]);
+  const [currentDeviceId, setCurrentDeviceId] = useState<string | null>(null);
   const [newGroupName, setNewGroupName] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [latestCreatedGroup, setLatestCreatedGroup] = useState<Group | null>(
@@ -29,6 +36,9 @@ export function GroupJoin({
   );
   const [joinErrorMessage, setJoinErrorMessage] = useState<string | null>(null);
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
+  const [confirmDeleteGroupId, setConfirmDeleteGroupId] = useState<
+    string | null
+  >(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
@@ -38,7 +48,20 @@ export function GroupJoin({
     setLoadErrorMessage(null);
 
     try {
-      setGroups(await getMyGroups());
+      const deviceId = await getDeviceId();
+      const myGroups = await getMyGroups();
+
+      setCurrentDeviceId(deviceId);
+      setGroups(myGroups);
+
+      if (
+        activeGroupId &&
+        !myGroups.some((group) => group.id === activeGroupId)
+      ) {
+        setActiveGroupId(null);
+        onActiveGroupChange(null);
+        setConfirmDeleteGroupId(null);
+      }
     } catch (error) {
       setLoadErrorMessage(
         error instanceof Error ? error.message : "Failed to load groups.",
@@ -50,7 +73,7 @@ export function GroupJoin({
 
   useEffect(() => {
     loadGroups();
-  }, []);
+  }, [activeGroupId, refreshKey]);
 
   function updateActiveGroup(groupId: string | null) {
     setActiveGroupId(groupId);
@@ -68,6 +91,7 @@ export function GroupJoin({
       setNewGroupName("");
       updateActiveGroup(group.id);
       await loadGroups();
+      onGroupsChanged();
     } catch (error) {
       setCreateErrorMessage(
         error instanceof Error ? error.message : "Failed to create group.",
@@ -92,6 +116,7 @@ export function GroupJoin({
       setJoinCode("");
       updateActiveGroup(group.id);
       await loadGroups();
+      onGroupsChanged();
     } catch (error) {
       setJoinErrorMessage(
         error instanceof Error ? error.message : "Failed to join group.",
@@ -112,9 +137,34 @@ export function GroupJoin({
       }
 
       await loadGroups();
+      onGroupsChanged();
     } catch (error) {
       setLoadErrorMessage(
         error instanceof Error ? error.message : "Failed to leave group.",
+      );
+    }
+  }
+
+  async function handleDeleteGroup(groupId: string) {
+    setLoadErrorMessage(null);
+
+    try {
+      await deleteGroup(groupId);
+
+      if (activeGroupId === groupId) {
+        updateActiveGroup(null);
+      }
+
+      if (latestCreatedGroup?.id === groupId) {
+        setLatestCreatedGroup(null);
+      }
+
+      setConfirmDeleteGroupId(null);
+      await loadGroups();
+      onGroupsChanged();
+    } catch (error) {
+      setLoadErrorMessage(
+        error instanceof Error ? error.message : "Failed to delete group.",
       );
     }
   }
@@ -220,26 +270,61 @@ export function GroupJoin({
         <ul className="group-list">
           {groups.map((group) => (
             <li className="group-item" key={group.id}>
-              <span>
-                {group.name ? (
-                  <>
-                    <span className="group-name">{group.name}</span>{" "}
-                    <span className="group-code">({group.join_code})</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="group-code">Join code:</span>{" "}
-                    <strong>{group.join_code}</strong>
-                  </>
-                )}
-              </span>
-              <button
-                className="secondary-button"
-                type="button"
-                onClick={() => handleLeaveGroup(group.id)}
-              >
-                Leave
-              </button>
+              <div>
+                <span>
+                  {group.name ? (
+                    <>
+                      <span className="group-name">{group.name}</span>{" "}
+                      <span className="group-code">({group.join_code})</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="group-code">Join code:</span>{" "}
+                      <strong>{group.join_code}</strong>
+                    </>
+                  )}
+                </span>
+                {confirmDeleteGroupId === group.id ? (
+                  <p className="muted-text">Delete this group and its tasks?</p>
+                ) : null}
+              </div>
+              <div className="group-actions">
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={() => handleLeaveGroup(group.id)}
+                >
+                  Leave
+                </button>
+                {currentDeviceId === group.created_by_device_id ? (
+                  confirmDeleteGroupId === group.id ? (
+                    <>
+                      <button
+                        className="danger-button"
+                        type="button"
+                        onClick={() => handleDeleteGroup(group.id)}
+                      >
+                        Confirm
+                      </button>
+                      <button
+                        className="secondary-button"
+                        type="button"
+                        onClick={() => setConfirmDeleteGroupId(null)}
+                      >
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      className="danger-button"
+                      type="button"
+                      onClick={() => setConfirmDeleteGroupId(group.id)}
+                    >
+                      Delete group
+                    </button>
+                  )
+                ) : null}
+              </div>
             </li>
           ))}
         </ul>
