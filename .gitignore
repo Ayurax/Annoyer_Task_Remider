@@ -12,6 +12,7 @@ local.properties
 node_modules/
 dist/
 .vite/
+vite-dev*.log
 
 # Environment
 .env

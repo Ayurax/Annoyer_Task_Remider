@@ -1,20 +1,31 @@
+import { useState } from "react";
 import { AddTaskForm } from "./components/AddTaskForm";
-import { GroupJoin } from "./components/GroupJoin";
 import { TaskList } from "./components/TaskList";
 
-/**
- * Web app shell.
- *
- * TODO: Wire shared state, Supabase realtime subscriptions, anonymous device identity,
- * and routes or tabs for task list, add task, and group join.
- */
 export function App() {
+  const [refreshKey, setRefreshKey] = useState(0);
+
   return (
-    <main>
-      {/* TODO: Replace scaffold markup with the final laptop web UI. */}
-      <TaskList />
-      <AddTaskForm />
-      <GroupJoin />
+    <main
+      style={{
+        display: "grid",
+        gap: "2rem",
+        maxWidth: "42rem",
+        margin: "2rem auto",
+        padding: "0 1rem",
+        fontFamily:
+          'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        fontSize: "1rem",
+        lineHeight: 1.5,
+      }}
+    >
+      <header>
+        <h1 style={{ marginBottom: "0.25rem" }}>Task Reminder</h1>
+        <p style={{ margin: 0 }}>Add tasks, see what is pending, and mark them done.</p>
+      </header>
+
+      <AddTaskForm onTaskAdded={() => setRefreshKey((key) => key + 1)} />
+      <TaskList refreshKey={refreshKey} />
     </main>
   );
 }
