@@ -1,1 +1,1 @@
-{"root":["./src/app.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/components/addtaskform.tsx","./src/components/groupjoin.tsx","./src/components/tasklist.tsx","./src/lib/deviceid.ts","./src/lib/deviceidentity.ts","./src/lib/supabaseclient.ts"],"version":"5.9.3"}
+{"root":["./src/app.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/components/addtaskform.tsx","./src/components/groupjoin.tsx","./src/components/tasklist.tsx","./src/lib/deviceid.ts","./src/lib/deviceidentity.ts","./src/lib/groups.ts","./src/lib/supabaseclient.ts"],"version":"5.9.3"}

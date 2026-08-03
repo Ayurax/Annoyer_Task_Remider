@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import { getDeviceId } from "../lib/deviceId";
+import { getActiveGroupId } from "../lib/groups";
 import { supabase } from "../lib/supabaseClient";
 
 interface AddTaskFormProps {
@@ -20,9 +21,11 @@ export function AddTaskForm({ onTaskAdded }: AddTaskFormProps) {
     setIsSubmitting(true);
 
     try {
-      const deviceId = await getDeviceId();
+      const activeGroupId = getActiveGroupId();
+      const deviceId = activeGroupId ? null : await getDeviceId();
       const { error } = await supabase.from("tasks").insert({
         owner_device_id: deviceId,
+        group_id: activeGroupId,
         title: title.trim(),
         notes: notes.trim() || null,
         due_at: new Date(dueAt).toISOString(),
@@ -49,43 +52,43 @@ export function AddTaskForm({ onTaskAdded }: AddTaskFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: "grid", gap: "0.75rem" }}>
-      <h2 style={{ margin: 0 }}>Add task</h2>
+    <form className="section form-grid" onSubmit={handleSubmit}>
+      <div className="section-header">
+        <h2 className="section-title">Add task</h2>
+      </div>
 
-      <label>
-        Title
+      <label className="field">
+        <span className="field-label">Title</span>
         <input
           required
           type="text"
           value={title}
           onChange={(event) => setTitle(event.target.value)}
-          style={{ display: "block", marginTop: "0.25rem", width: "100%" }}
         />
       </label>
 
-      <label>
-        Notes
+      <label className="field">
+        <span className="field-label">Notes</span>
         <textarea
           value={notes}
           onChange={(event) => setNotes(event.target.value)}
           rows={3}
-          style={{ display: "block", marginTop: "0.25rem", width: "100%" }}
         />
       </label>
 
-      <label>
-        Due date and time
+      <label className="field">
+        <span className="field-label">Due date and time</span>
         <input
           required
           type="datetime-local"
           value={dueAt}
           onChange={(event) => setDueAt(event.target.value)}
-          style={{ display: "block", marginTop: "0.25rem", width: "100%" }}
         />
+        <span className="helper-text">Use your local date and time.</span>
       </label>
 
-      <label>
-        Nag interval in minutes
+      <label className="field">
+        <span className="field-label">Nag interval in minutes</span>
         <input
           min={1}
           required
@@ -94,12 +97,11 @@ export function AddTaskForm({ onTaskAdded }: AddTaskFormProps) {
           onChange={(event) =>
             setNagIntervalMinutes(Number(event.target.value))
           }
-          style={{ display: "block", marginTop: "0.25rem", width: "100%" }}
         />
       </label>
 
       {errorMessage ? (
-        <p style={{ color: "#b00020", margin: 0 }}>{errorMessage}</p>
+        <p className="error-text">{errorMessage}</p>
       ) : null}
 
       <button disabled={isSubmitting} type="submit">

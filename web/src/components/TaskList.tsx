@@ -13,10 +13,11 @@ interface Task {
 }
 
 interface TaskListProps {
+  activeGroupId: string | null;
   refreshKey: number;
 }
 
-export function TaskList({ refreshKey }: TaskListProps) {
+export function TaskList({ activeGroupId, refreshKey }: TaskListProps) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -29,15 +30,22 @@ export function TaskList({ refreshKey }: TaskListProps) {
       setErrorMessage(null);
 
       try {
-        const deviceId = await getDeviceId();
-        const { data, error } = await supabase
+        let query = supabase
           .from("tasks")
           .select(
             "id,title,notes,due_at,nag_interval_minutes,status,completed_at",
           )
-          .eq("owner_device_id", deviceId)
           .eq("status", "pending")
           .order("due_at", { ascending: true });
+
+        if (activeGroupId) {
+          query = query.eq("group_id", activeGroupId);
+        } else {
+          const deviceId = await getDeviceId();
+          query = query.eq("owner_device_id", deviceId);
+        }
+
+        const { data, error } = await query;
 
         if (error) {
           throw error;
@@ -64,7 +72,7 @@ export function TaskList({ refreshKey }: TaskListProps) {
     return () => {
       isCurrent = false;
     };
-  }, [refreshKey]);
+  }, [activeGroupId, refreshKey]);
 
   async function markDone(taskId: string) {
     setErrorMessage(null);
@@ -88,33 +96,38 @@ export function TaskList({ refreshKey }: TaskListProps) {
   }
 
   if (isLoading) {
-    return <p>Loading tasks...</p>;
+    return <p className="muted-text">Loading tasks...</p>;
   }
 
   return (
-    <section style={{ display: "grid", gap: "0.75rem" }}>
-      <h2 style={{ margin: 0 }}>Pending tasks</h2>
+    <section className="section">
+      <div className="section-header">
+        <h2 className="section-title">
+          {activeGroupId ? "Group pending tasks" : "Personal pending tasks"}
+        </h2>
+      </div>
 
       {errorMessage ? (
-        <p style={{ color: "#b00020", margin: 0 }}>{errorMessage}</p>
+        <p className="error-text">{errorMessage}</p>
       ) : null}
 
-      {tasks.length === 0 ? <p>No pending tasks</p> : null}
+      {tasks.length === 0 ? <p className="muted-text">No pending tasks</p> : null}
 
-      <ul style={{ display: "grid", gap: "0.75rem", listStyle: "none", padding: 0 }}>
+      <ul className="task-list">
         {tasks.map((task) => (
-          <li
-            key={task.id}
-            style={{ border: "1px solid #ddd", padding: "0.75rem" }}
-          >
-            <h3 style={{ margin: "0 0 0.25rem" }}>{task.title}</h3>
-            <p style={{ margin: "0 0 0.5rem" }}>
-              Due {new Date(task.due_at).toLocaleString()}
-            </p>
-            {task.notes ? <p style={{ marginTop: 0 }}>{task.notes}</p> : null}
-            <button type="button" onClick={() => markDone(task.id)}>
-              Mark done
-            </button>
+          <li className="task-card" key={task.id}>
+            <div className="task-content">
+              <h3 className="task-title">{task.title}</h3>
+              <p className="task-meta">
+                Due {new Date(task.due_at).toLocaleString()}
+              </p>
+              {task.notes ? <p className="task-notes">{task.notes}</p> : null}
+            </div>
+            <div className="task-actions">
+              <button type="button" onClick={() => markDone(task.id)}>
+                Mark done
+              </button>
+            </div>
           </li>
         ))}
       </ul>
