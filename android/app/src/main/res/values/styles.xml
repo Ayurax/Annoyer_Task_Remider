@@ -1,0 +1,6 @@
+<resources>
+    <style name="Theme.TaskReminder" parent="android:style/Theme.Material.Light.NoActionBar">
+        <!-- TODO: Move to a Compose Material 3 theme once UI implementation starts. -->
+        <item name="android:colorAccent">@color/task_reminder_primary</item>
+    </style>
+</resources>

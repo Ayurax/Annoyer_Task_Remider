@@ -1,0 +1,4 @@
+<resources>
+    <!-- TODO: Replace scaffold colors with app theme tokens. -->
+    <color name="task_reminder_primary">#245C73</color>
+</resources>
