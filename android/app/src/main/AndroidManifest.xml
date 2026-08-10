@@ -1,4 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
     <!-- TODO: Add notification, exact alarm, and full-screen intent permissions once behavior is implemented. -->
 
     <application

@@ -32,6 +32,7 @@ export function TaskList({
 
   useEffect(() => {
     let isCurrent = true;
+    let subscription: any = null;
 
     async function fetchTasks() {
       setIsLoading(true);
@@ -86,10 +87,39 @@ export function TaskList({
       }
     }
 
+    // Initial fetch
     fetchTasks();
+
+    // Setup realtime subscription
+    async function setupSubscription() {
+      try {
+        const deviceId = await getDeviceId();
+        const channel = supabase
+          .channel('tasks-changes')
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'tasks' },
+            (payload) => {
+              if (!isCurrent) return;
+              // Refetch the tasks to keep the list in sync
+              fetchTasks();
+            }
+          )
+          .subscribe();
+
+        subscription = channel;
+      } catch (error) {
+        console.error('Error setting up realtime subscription:', error);
+      }
+    }
+
+    setupSubscription();
 
     return () => {
       isCurrent = false;
+      if (subscription) {
+        supabase.removeChannel(subscription);
+      }
     };
   }, [activeGroupId, onActiveGroupMissing, refreshKey]);
 

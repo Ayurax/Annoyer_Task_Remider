@@ -2,29 +2,15 @@ import { getDeviceId } from "./deviceId";
 import { supabase } from "./supabaseClient";
 
 const ACTIVE_GROUP_ID_STORAGE_KEY = "active_group_id";
-const JOIN_CODE_CHARACTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-const JOIN_CODE_LENGTH = 6;
-
 export interface Group {
   id: string;
   join_code: string;
   name: string | null;
-  created_by_device_id: string | null;
-}
-
-interface GroupMemberRow {
-  groups: Group | Group[] | null;
+  created_by_identity_id: string | null;
 }
 
 export function formatGroupLabel(group: Pick<Group, "name" | "join_code">): string {
   return group.name ? `${group.name} (${group.join_code})` : group.join_code;
-}
-
-function generateJoinCode(): string {
-  return Array.from({ length: JOIN_CODE_LENGTH }, () => {
-    const index = Math.floor(Math.random() * JOIN_CODE_CHARACTERS.length);
-    return JOIN_CODE_CHARACTERS[index];
-  }).join("");
 }
 
 export function getActiveGroupId(): string | null {
@@ -44,42 +30,18 @@ export async function createGroup(name?: string): Promise<Group> {
   const deviceId = await getDeviceId();
   const trimmedName = name?.trim();
 
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    const joinCode = generateJoinCode();
-    const { data, error } = await supabase
-      .from("groups")
-      .insert({
-        created_by_device_id: deviceId,
-        join_code: joinCode,
-        name: trimmedName || null,
-      })
-      .select("id,join_code,name,created_by_device_id")
-      .single();
+  const { data, error } = await supabase
+    .rpc("create_group_for_device", {
+      p_device_id: deviceId,
+      p_name: trimmedName || null,
+    })
+    .single();
 
-    if (error) {
-      if (error.code === "23505" && attempt < 2) {
-        continue;
-      }
-
-      throw new Error(`Failed to create group: ${error.message}`);
-    }
-
-    const group = data as Group;
-    const { error: membershipError } = await supabase
-      .from("group_members")
-      .upsert(
-        { group_id: group.id, device_id: deviceId },
-        { onConflict: "group_id,device_id" },
-      );
-
-    if (membershipError) {
-      throw new Error(`Failed to join new group: ${membershipError.message}`);
-    }
-
-    return group;
+  if (error) {
+    throw new Error(`Failed to create group: ${error.message}`);
   }
 
-  throw new Error("Failed to generate a unique join code. Try again.");
+  return data as Group;
 }
 
 export async function joinGroup(joinCode: string): Promise<{ id: string } | null> {
@@ -89,79 +51,74 @@ export async function joinGroup(joinCode: string): Promise<{ id: string } | null
     return null;
   }
 
+  const deviceId = await getDeviceId();
   const { data: group, error } = await supabase
-    .from("groups")
-    .select("id")
-    .ilike("join_code", normalizedJoinCode)
+    .rpc("join_group_for_device", {
+      p_device_id: deviceId,
+      p_join_code: normalizedJoinCode,
+    })
     .maybeSingle();
 
   if (error) {
-    throw new Error(`Failed to look up group: ${error.message}`);
+    throw new Error(`Failed to join group: ${error.message}`);
   }
 
   if (!group) {
     return null;
   }
 
-  const deviceId = await getDeviceId();
-  const { error: membershipError } = await supabase
-    .from("group_members")
-    .upsert(
-      { group_id: group.id, device_id: deviceId },
-      { onConflict: "group_id,device_id" },
-    );
-
-  if (membershipError) {
-    throw new Error(`Failed to join group: ${membershipError.message}`);
-  }
-
-  return { id: group.id as string };
+  return { id: (group as Group).id };
 }
 
 export async function getMyGroups(): Promise<Group[]> {
   const deviceId = await getDeviceId();
   const { data, error } = await supabase
-    .from("group_members")
-    .select("groups(id,join_code,name,created_by_device_id)")
-    .eq("device_id", deviceId);
+    .rpc("get_groups_for_device", { p_device_id: deviceId });
 
   if (error) {
     throw new Error(`Failed to load groups: ${error.message}`);
   }
 
-  return ((data ?? []) as unknown as GroupMemberRow[])
-    .map((row) => (Array.isArray(row.groups) ? row.groups[0] : row.groups))
-    .filter((group): group is Group => Boolean(group));
+  return (data ?? []) as Group[];
+}
+
+export async function getCurrentIdentityId(): Promise<string> {
+  const deviceId = await getDeviceId();
+  const { data, error } = await supabase
+    .rpc("identity_for_device", { p_device_id: deviceId })
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to load identity: ${error.message}`);
+  }
+
+  if (!data) {
+    throw new Error("Device identity not found.");
+  }
+
+  return data as string;
 }
 
 export async function leaveGroup(groupId: string): Promise<void> {
   const deviceId = await getDeviceId();
   const { error } = await supabase
-    .from("group_members")
-    .delete()
-    .eq("group_id", groupId)
-    .eq("device_id", deviceId);
+    .rpc("leave_group_for_device", {
+      p_device_id: deviceId,
+      p_group_id: groupId,
+    });
 
   if (error) {
     throw new Error(`Failed to leave group: ${error.message}`);
   }
-
-  const { count, error: countError } = await supabase
-    .from("group_members")
-    .select("group_id", { count: "exact", head: true })
-    .eq("group_id", groupId);
-
-  if (countError) {
-    throw new Error(`Failed to check group membership: ${countError.message}`);
-  }
-
-  if ((count ?? 0) === 0) {
-    await deleteGroup(groupId, { skipOwnershipCheck: true });
-  }
 }
 
 async function deleteGroupRecord(groupId: string): Promise<void> {
-  const { error } = await supabase.from("groups").delete().eq("id", groupId);
+  const deviceId = await getDeviceId();
+  const { error } = await supabase
+    .rpc("delete_group_for_device", {
+      p_device_id: deviceId,
+      p_group_id: groupId,
+    });
 
   if (error) {
     throw new Error(`Failed to delete group: ${error.message}`);
@@ -180,7 +137,7 @@ export async function deleteGroup(
   const deviceId = await getDeviceId();
   const { data: group, error: lookupError } = await supabase
     .from("groups")
-    .select("created_by_device_id")
+    .select("created_by_identity_id")
     .eq("id", groupId)
     .maybeSingle();
 
@@ -192,9 +149,42 @@ export async function deleteGroup(
     return;
   }
 
-  if (group.created_by_device_id !== deviceId) {
-    throw new Error("Only the group creator can delete this group.");
+  await deleteGroupRecord(groupId);
+}
+
+export async function getOrCreateIdentityLinkCode(): Promise<string> {
+  const deviceId = await getDeviceId();
+  const { data, error } = await supabase
+    .rpc("create_identity_for_device", { p_device_id: deviceId });
+
+  if (error) {
+    throw new Error(`Failed to get/create identity: ${error.message}`);
   }
 
-  await deleteGroupRecord(groupId);
+  if (!data || data.length === 0) {
+    throw new Error("No identity data returned");
+  }
+
+  // The RPC returns an array of objects, we want the first one's link_code
+  return (data as Array<{link_code: string}>)[0].link_code;
+}
+
+export async function linkDeviceToIdentity(linkCode: string): Promise<string> {
+  const deviceId = await getDeviceId();
+  const { data, error } = await supabase
+    .rpc("link_device_to_identity", {
+      p_device_id: deviceId,
+      p_link_code: linkCode.toUpperCase().trim()
+    });
+
+  if (error) {
+    throw new Error(`Failed to link device to identity: ${error.message}`);
+  }
+
+  if (!data || data.length === 0) {
+    throw new Error("No identity data returned from linking");
+  }
+
+  // The RPC returns an array of objects, we want the first one's link_code
+  return (data as Array<{link_code: string}>)[0].link_code;
 }

@@ -34,6 +34,7 @@ export function AllTasksOverview({
 
   useEffect(() => {
     let isCurrent = true;
+    let subscription: any = null;
 
     async function fetchOverviewTasks() {
       setIsLoading(true);
@@ -112,10 +113,42 @@ export function AllTasksOverview({
       }
     }
 
+    // Initial fetch
     fetchOverviewTasks();
+
+    // Setup realtime subscription
+    async function setupSubscription() {
+      try {
+        const deviceId = await getDeviceId();
+        const groups = await getMyGroups();
+        const groupIds = groups.map((group) => group.id);
+
+        const channel = supabase
+          .channel('all-tasks-changes')
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'tasks' },
+            (payload) => {
+              if (!isCurrent) return;
+              // Refetch all tasks to keep the list in sync
+              fetchOverviewTasks();
+            }
+          )
+          .subscribe();
+
+        subscription = channel;
+      } catch (error) {
+        console.error('Error setting up realtime subscription for all tasks:', error);
+      }
+    }
+
+    setupSubscription();
 
     return () => {
       isCurrent = false;
+      if (subscription) {
+        supabase.removeChannel(subscription);
+      }
     };
   }, [refreshKey]);
 

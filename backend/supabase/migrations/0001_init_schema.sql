@@ -1,18 +1,21 @@
 -- Initial schema for the task reminder app.
 -- Supabase/Postgres compatible migration.
 
+create extension if not exists citext;
+
 create extension if not exists pgcrypto;
 
 -- Anonymous device identities used instead of auth/login accounts.
 create table public.devices (
   id uuid primary key default gen_random_uuid(),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  fcm_token text
 );
 
 -- Small shared task groups discoverable through short human-typeable join codes.
 create table public.groups (
   id uuid primary key default gen_random_uuid(),
-  join_code text not null unique,
+  join_code citext not null unique,
   created_at timestamptz not null default now()
 );
 
@@ -67,36 +70,36 @@ alter table public.achievements enable row level security;
 create policy "allow all devices access"
   on public.devices
   for all
-  using (true)
-  with check (true);
+  using (auth.role() = 'authenticated')
+  with check (auth.role() = 'authenticated');
 
 -- TODO: tighten RLS once device-id verification is added.
 create policy "allow all groups access"
   on public.groups
   for all
-  using (true)
-  with check (true);
+  using (auth.role() = 'authenticated')
+  with check (auth.role() = 'authenticated');
 
 -- TODO: tighten RLS once device-id verification is added.
 create policy "allow all group_members access"
   on public.group_members
   for all
-  using (true)
-  with check (true);
+  using (auth.role() = 'authenticated')
+  with check (auth.role() = 'authenticated');
 
 -- TODO: tighten RLS once device-id verification is added.
 create policy "allow all tasks access"
   on public.tasks
   for all
-  using (true)
-  with check (true);
+  using (auth.role() = 'authenticated')
+  with check (auth.role() = 'authenticated');
 
 -- TODO: tighten RLS once device-id verification is added.
 create policy "allow all achievements access"
   on public.achievements
   for all
-  using (true)
-  with check (true);
+  using (auth.role() = 'authenticated')
+  with check (auth.role() = 'authenticated');
 
 -- Example manual test data only:
 -- insert into public.devices (id) values ('00000000-0000-0000-0000-000000000001');
@@ -109,5 +112,7 @@ create policy "allow all achievements access"
 --   '00000000-0000-0000-0000-000000000001',
 --   'Test reminder',
 --   'Manual migration smoke test task',
---   now() + interval '1 hour'
+--   'now() + interval '1 hour'
 -- );
+
+ALTER PUBLICATION supabase_realtime ADD TABLE tasks, groups, group_members;

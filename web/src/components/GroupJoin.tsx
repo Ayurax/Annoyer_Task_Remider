@@ -3,11 +3,14 @@ import {
   createGroup,
   deleteGroup,
   formatGroupLabel,
+  getCurrentIdentityId,
   getMyGroups,
   Group,
   joinGroup,
   leaveGroup,
   setActiveGroupId,
+  getOrCreateIdentityLinkCode,
+  linkDeviceToIdentity,
 } from "../lib/groups";
 import { getDeviceId } from "../lib/deviceId";
 
@@ -27,7 +30,7 @@ export function GroupJoin({
   refreshKey,
 }: GroupJoinProps) {
   const [groups, setGroups] = useState<Group[]>([]);
-  const [currentDeviceId, setCurrentDeviceId] = useState<string | null>(null);
+  const [currentIdentityId, setCurrentIdentityId] = useState<string | null>(null);
   const [newGroupName, setNewGroupName] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [latestCreatedGroup, setLatestCreatedGroup] = useState<Group | null>(null);
@@ -41,15 +44,25 @@ export function GroupJoin({
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
 
+  // Identity linking state
+  const [linkCode, setLinkCode] = useState<string | null>(null);
+  const [linkCodeError, setLinkCodeError] = useState<string | null>(null);
+  const [isLoadingLinkCode, setIsLoadingLinkCode] = useState(false);
+  const [enteredLinkCode, setEnteredLinkCode] = useState("");
+  const [isLinking, setIsLinking] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const [linkSuccess, setLinkSuccess] = useState<string | null>(null);
+
   async function loadGroups() {
     setIsLoading(true);
     setLoadErrorMessage(null);
 
     try {
-      const deviceId = await getDeviceId();
+      await getDeviceId();
+      const identityId = await getCurrentIdentityId();
       const myGroups = await getMyGroups();
 
-      setCurrentDeviceId(deviceId);
+      setCurrentIdentityId(identityId);
       setGroups(myGroups);
       onGroupsLoaded(myGroups);
 
@@ -66,6 +79,33 @@ export function GroupJoin({
       setIsLoading(false);
     }
   }
+
+  async function loadLinkCode() {
+    if (!currentIdentityId) return;
+
+    setIsLoadingLinkCode(true);
+    setLinkCodeError(null);
+    try {
+      const code = await getOrCreateIdentityLinkCode();
+      setLinkCode(code);
+    } catch (error) {
+      setLinkCodeError(
+        error instanceof Error ? error.message : "Failed to get identity link code.",
+      );
+    } finally {
+      setIsLoadingLinkCode(false);
+    }
+  }
+
+  useEffect(() => {
+    loadGroups();
+  }, [activeGroupId, refreshKey]);
+
+  useEffect(() => {
+    if (currentIdentityId) {
+      loadLinkCode();
+    }
+  }, [currentIdentityId]);
 
   useEffect(() => {
     loadGroups();
@@ -187,6 +227,47 @@ export function GroupJoin({
     }
   }
 
+  async function copyLinkCode() {
+    if (!linkCode) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(linkCode);
+      setLinkSuccess("Link code copied to clipboard.");
+    } catch {
+      setLinkSuccess("Copy failed. Select the code and copy it manually.");
+    }
+  }
+
+  async function handleLinkDevice() {
+    if (!enteredLinkCode.trim()) {
+      setLinkError("Please enter a link code.");
+      return;
+    }
+
+    setIsLinking(true);
+    setLinkError(null);
+    setLinkSuccess(null);
+
+    try {
+      await linkDeviceToIdentity(enteredLinkCode.trim().toUpperCase());
+      setLinkSuccess("Successfully linked device to identity.");
+      setEnteredLinkCode("");
+      // Reload link code in case it changed
+      await loadLinkCode();
+      // Reload groups since identity might have changed
+      await loadGroups();
+      onGroupsChanged();
+    } catch (error) {
+      setLinkError(
+        error instanceof Error ? error.message : "Failed to link device.",
+      );
+    } finally {
+      setIsLinking(false);
+    }
+  }
+
   return (
     <section className="section scope-panel">
       <div className="section-header">
@@ -277,6 +358,48 @@ export function GroupJoin({
 
       {isLoading ? <p className="muted-text">Loading groups...</p> : null}
 
+      {/* Identity Linking Section */}
+      <div className="form-grid">
+        <label className="field">
+          <span className="field-label">Device Identity</span>
+          {isLoadingLinkCode ? (
+            <p className="muted-text">Loading your identity link code...</p>
+          ) : linkCode ? (
+            <>
+              <p className="join-code-label">Your sync code:</p>
+              <div className="row">
+                <span className="join-code-value">{linkCode}</span>
+                <button type="button" onClick={copyLinkCode}>
+                  Copy code
+                </button>
+              </div>
+              {linkSuccess ? <p className="muted-text">{linkSuccess}</p> : null}
+            </>
+          ) : linkCodeError ? (
+            <p className="error-text">{linkCodeError}</p>
+          ) : null}
+        </label>
+      </div>
+
+      <div className="form-grid">
+        <label className="field">
+          <span className="field-label">Link to existing identity</span>
+          <div className="row">
+            <input
+              aria-label="Link code"
+              placeholder="Enter link code"
+              value={enteredLinkCode}
+              onChange={(event) => setEnteredLinkCode(event.target.value.toUpperCase())}
+            />
+            <button disabled={isLinking} type="button" onClick={handleLinkDevice}>
+              {isLinking ? "Linking..." : "Link Device"}
+            </button>
+          </div>
+        </label>
+        {linkError ? <p className="error-text">{linkError}</p> : null}
+        {linkSuccess && !isLinking ? <p className="muted-text">{linkSuccess}</p> : null}
+      </div>
+
       {!isLoading && groups.length > 0 ? (
         <ul className="group-list">
           {groups.map((group) => (
@@ -307,7 +430,7 @@ export function GroupJoin({
                 >
                   Leave
                 </button>
-                {currentDeviceId === group.created_by_device_id ? (
+                {currentIdentityId === group.created_by_identity_id ? (
                   confirmDeleteGroupId === group.id ? (
                     <>
                       <button
