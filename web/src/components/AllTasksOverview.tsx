@@ -5,7 +5,7 @@ import { supabase } from "../lib/supabaseClient";
 
 interface Task {
   id: string;
-  owner_device_id: string | null;
+  owner_identity_id: string | null;
   group_id: string | null;
   title: string;
   notes: string | null;
@@ -51,9 +51,9 @@ export function AllTasksOverview({
         const { data: personalTasks, error: personalError } = await supabase
           .from("tasks")
           .select(
-            "id,owner_device_id,group_id,title,notes,due_at,nag_interval_minutes,status,completed_at",
+            "id,owner_identity_id,group_id,title,notes,due_at,nag_interval_minutes,status,completed_at",
           )
-          .eq("owner_device_id", deviceId)
+          .eq("owner_identity_id", deviceId)
           .eq("status", "pending");
 
         if (personalError) {
@@ -66,7 +66,7 @@ export function AllTasksOverview({
           const { data, error } = await supabase
             .from("tasks")
             .select(
-              "id,owner_device_id,group_id,title,notes,due_at,nag_interval_minutes,status,completed_at",
+              "id,owner_identity_id,group_id,title,notes,due_at,nag_interval_minutes,status,completed_at",
             )
             .in("group_id", groupIds)
             .eq("status", "pending");

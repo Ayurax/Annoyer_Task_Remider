@@ -2,6 +2,7 @@ package com.example.taskreminder.ui
 
 import android.content.ClipboardManager
 import android.content.Context
+import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -71,7 +72,9 @@ fun SettingsScreen(
                 val identityId = deviceIdStore.getIdentityId()
                 currentIdentityId = identityId
             } catch (e: Exception) {
-                // Handle error appropriately
+                Log.e("SettingsScreen", "Failed to load identity", e)
+                currentIdentityId = null
+                linkCodeError = "Failed to load identity: ${e.message}"
             }
         }
     }

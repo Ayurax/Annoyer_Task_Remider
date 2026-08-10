@@ -130,7 +130,7 @@ export function AddTaskForm({
     try {
       const deviceId = assignedGroupId ? null : await getDeviceId();
       const { error } = await supabase.from("tasks").insert({
-        owner_device_id: deviceId,
+        owner_identity_id: deviceId,
         group_id: assignedGroupId,
         title: title.trim(),
         notes: notes.trim() || null,

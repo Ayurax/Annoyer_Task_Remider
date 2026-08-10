@@ -251,51 +251,12 @@ class MainActivity : ComponentActivity() {
                     },
                 )
 
-                // Identity Linking Section
-                var linkCodeState by rememberSaveable { mutableStateOf<String?>(null) }
-                var linkCodeErrorState by rememberSaveable { mutableStateOf<String?>(null) }
-                var isLoadingLinkCodeState by rememberSaveable { mutableStateOf(false) }
-                var enteredLinkCodeState by rememberSaveable { mutableStateOf("") }
-                var isLinkingState by rememberSaveable { mutableStateOf(false) }
-                var linkErrorState by rememberSaveable { mutableStateOf<String?>(null) }
-                var linkSuccessState by rememberSaveable { mutableStateOf<String?>(null) }
-
-                IdentityLinkingSection(
-                    linkCodeState = linkCodeState,
-                    linkCodeErrorState = linkCodeErrorState,
-                    isLoadingLinkCodeState = isLoadingLinkCodeState,
-                    enteredLinkCodeState = enteredLinkCodeState,
-                    isLinkingState = isLinkingState,
-                    linkErrorState = linkErrorState,
-                    linkSuccessState = linkSuccessState,
-                    currentIdentityId = currentIdentityId,
-                    groupRepository = groupRepository,
-                    coroutineScope = rememberCoroutineScope(),
-                    onGetLinkCode = { code ->
-                        linkCodeState = code
-                        linkCodeErrorState = null
-                    },
-                    onLinkCodeError = { error ->
-                        linkCodeErrorState = error
-                        linkCodeState = null
-                    },
-                    onLinkingStarted = {
-                        isLinkingState = true
-                        linkErrorState = null
-                        linkSuccessState = null
-                    },
-                    onLinkingFinished = {
-                        isLinkingState = false
-                    },
-                    onLinkSuccess = { successMessage, newLinkCode ->
-                        linkSuccessState = successMessage
-                        linkCodeState = newLinkCode
-                        enteredLinkCodeState = ""
-                        refreshKey += 1
-                    },
-                    onLinkError = { errorMessage ->
-                        linkErrorState = errorMessage
-                    }
+                // Device identity management is available in Settings
+                Text(
+                    text = "Manage device identity in Settings",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF0066CC),
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
                 )
 
                 when (selectedTab) {
