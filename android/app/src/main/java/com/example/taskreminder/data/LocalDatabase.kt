@@ -1,9 +1,28 @@
 package com.example.taskreminder.data
 
-/**
- * Room database boundary for offline-first task data.
- *
- * TODO: Add entities for devices, groups, group members, tasks, and achievements.
- * TODO: Add DAOs for local task reads/writes before remote sync.
- */
-abstract class LocalDatabase
+import android.content.Context
+import androidx.room.Database
+import androidx.room.Room
+import androidx.room.RoomDatabase
+
+@Database(entities = [TaskEntity::class, GroupEntity::class], version = 1, exportSchema = false)
+abstract class LocalDatabase : RoomDatabase() {
+    abstract fun taskDao(): TaskDao
+    abstract fun groupDao(): GroupDao
+
+    companion object {
+        @Volatile
+        private var INSTANCE: LocalDatabase? = null
+
+        fun getInstance(context: Context): LocalDatabase {
+            return INSTANCE ?: synchronized(this) {
+                INSTANCE ?: buildDatabase(context).also { INSTANCE = it }
+            }
+        }
+
+        private fun buildDatabase(context: Context) =
+            Room.databaseBuilder(context.applicationContext, LocalDatabase::class.java, "task_reminder_db")
+                .fallbackToDestructiveMigration()
+                .build()
+    }
+}

@@ -24,7 +24,7 @@ fun TaskListScreen(
     isLoading: Boolean,
     errorMessage: String?,
     onRefresh: () -> Unit,
-    onMarkDone: (String) -> Unit,
+    onMarkDone: (Long) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
@@ -62,7 +62,7 @@ fun TaskListScreen(
                             Text(text = it, style = MaterialTheme.typography.bodyMedium)
                         }
                         Button(
-                            onClick = { task.id?.let(onMarkDone) },
+                            onClick = { task.localId?.let { id -> onMarkDone(id) } },
                             shape = RectangleShape,
                         ) {
                             Text("Mark done")

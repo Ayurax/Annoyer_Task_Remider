@@ -9,7 +9,7 @@ plugins {
 import java.util.Properties
 
 val localProperties = Properties().apply {
-    val localPropertiesFile = rootProject.file("local.properties")
+    val localPropertiesFile = file("local.properties")
     if (localPropertiesFile.exists()) {
         localPropertiesFile.inputStream().use { load(it) }
     }
@@ -79,4 +79,10 @@ dependencies {
 
     implementation("androidx.work:work-runtime-ktx:2.10.0")
     implementation("com.google.firebase:firebase-messaging-ktx:24.1.0")
+
+    // Room dependencies
+    val roomVersion = "2.6.1"
+    implementation("androidx.room:room-runtime:$roomVersion")
+    implementation("androidx.room:room-ktx:$roomVersion")
+    ksp("androidx.room:room-compiler:$roomVersion")
 }

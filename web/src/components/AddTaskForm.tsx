@@ -75,7 +75,8 @@ export function AddTaskForm({
 }: AddTaskFormProps) {
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
-  const [dueAt, setDueAt] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [dueTime, setDueTime] = useState("");
   const [nagIntervalMinutes, setNagIntervalMinutes] = useState(30);
   const [assignedGroupId, setAssignedGroupId] = useState<string | null>(
     activeGroupId,
@@ -86,7 +87,7 @@ export function AddTaskForm({
     null,
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const dueAtInputRef = useRef<HTMLInputElement>(null);
+  const dueDateRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setAssignedGroupId(activeGroupId);
@@ -117,11 +118,12 @@ export function AddTaskForm({
     setSuccessMessage(null);
     setDueAtErrorMessage(null);
 
-    const parsedDueAt = parseDueAt(dueAt);
+    const combinedDueAt = dueDate && dueTime ? `${dueDate}T${dueTime}` : "";
+    const parsedDueAt = parseDueAt(combinedDueAt);
 
     if ("errorMessage" in parsedDueAt) {
       setDueAtErrorMessage(parsedDueAt.errorMessage);
-      dueAtInputRef.current?.focus();
+      dueDateRef.current?.focus();
       return;
     }
 
@@ -145,7 +147,8 @@ export function AddTaskForm({
 
       setTitle("");
       setNotes("");
-      setDueAt("");
+      setDueDate("");
+      setDueTime("");
       setNagIntervalMinutes(30);
       setAssignedGroupId(activeGroupId);
       if (assignedGroupId !== activeGroupId) {
@@ -186,25 +189,42 @@ export function AddTaskForm({
         />
       </label>
 
-      <label className="field">
-        <span className="field-label">Due date and time</span>
-        <input
-          ref={dueAtInputRef}
-          required
-          type="datetime-local"
-          value={dueAt}
-          onChange={(event) => {
-            setDueAt(event.target.value);
-            if (dueAtErrorMessage) {
-              setDueAtErrorMessage(null);
-            }
-          }}
-        />
-        {dueAtErrorMessage ? (
-          <p className="error-text">{dueAtErrorMessage}</p>
-        ) : null}
-        <span className="helper-text">Use your local date and time.</span>
-      </label>
+      <div className="field">
+        <span className="field-label">Due</span>
+        <div className="row">
+          <label className="field">
+            <input
+              ref={dueDateRef}
+              required
+              type="date"
+              value={dueDate}
+              onChange={(event) => {
+                setDueDate(event.target.value);
+                if (dueAtErrorMessage) {
+                  setDueAtErrorMessage(null);
+                }
+              }}
+            />
+          </label>
+          <label className="field">
+            <input
+              required
+              type="time"
+              value={dueTime}
+              onChange={(event) => {
+                setDueTime(event.target.value);
+                if (dueAtErrorMessage) {
+                  setDueAtErrorMessage(null);
+                }
+              }}
+            />
+          </label>
+        </div>
+      </div>
+      {dueAtErrorMessage ? (
+        <p className="error-text">{dueAtErrorMessage}</p>
+      ) : null}
+      <span className="helper-text">Use your local date and time.</span>
 
       <label className="field">
         <span className="field-label">Assign to</span>
@@ -235,6 +255,9 @@ export function AddTaskForm({
             setNagIntervalMinutes(Number(event.target.value))
           }
         />
+        <span className="helper-text">
+          How often to repeat the reminder until the task is marked done.
+        </span>
       </label>
 
       {errorMessage ? (

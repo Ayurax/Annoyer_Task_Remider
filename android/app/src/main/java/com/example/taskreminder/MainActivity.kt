@@ -29,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -50,18 +51,24 @@ import com.example.taskreminder.ui.SettingsScreen
 import com.example.taskreminder.data.DeviceIdStore
 import com.example.taskreminder.data.Group
 import com.example.taskreminder.data.GroupRepository
+import com.example.taskreminder.data.OfflineSyncCoordinator
 import com.example.taskreminder.data.TaskRecord
 import com.example.taskreminder.data.TaskRepository
 import com.example.taskreminder.ui.AddTaskScreen
 import com.example.taskreminder.ui.TaskListScreen
 import com.example.taskreminder.ui.theme.TaskReminderTheme
-import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         enableEdgeToEdge()
+
+        val offlineSyncCoordinator = OfflineSyncCoordinator(this)
+        lifecycleScope.launch(Dispatchers.IO) {
+            offlineSyncCoordinator.manuallySync()
+        }
+
         setContent {
             TaskReminderTheme {
                 TaskReminderApp()
@@ -99,7 +106,7 @@ class MainActivity : ComponentActivity() {
                 isLoading = true
                 errorMessage = null
                 try {
-                    tasks = taskRepository.fetchPendingTasks(activeGroupId)
+                    tasks = taskRepository.fetchPendingTasks(activeGroupId, currentIdentityId)
                 } catch (e: Exception) {
                     errorMessage = e.message ?: "Failed to load tasks."
                 } finally {
@@ -265,10 +272,10 @@ class MainActivity : ComponentActivity() {
                         isLoading = isLoading,
                         errorMessage = errorMessage,
                         onRefresh = { refreshKey += 1 },
-                        onMarkDone = { taskId ->
+                        onMarkDone = { localId ->
                             coroutineScope.launch {
                                 try {
-                                    taskRepository.markTaskDone(taskId)
+                                    taskRepository.markTaskDone(localId)
                                     refreshKey += 1
                                 } catch (e: Exception) {
                                     errorMessage = e.message ?: "Failed to complete task."
