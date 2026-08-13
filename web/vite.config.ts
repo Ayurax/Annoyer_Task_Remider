@@ -6,6 +6,8 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      srcDir: "src",
+      strategies: "injectManifest",
       registerType: "autoUpdate",
       injectRegister: "auto",
       manifest: {
@@ -29,7 +31,7 @@ export default defineConfig({
           }
         ]
       },
-      workbox: {
+      injectManifest: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg}"],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024
       }

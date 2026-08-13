@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "726971025825",
+    "project_id": "annoyer-task-reminder",
+    "storage_bucket": "annoyer-task-reminder.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:726971025825:android:1bf2045230eb180eb8e3e0",
+        "android_client_info": {
+          "package_name": "com.example.taskreminder"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCKqHGKpEKAsQ2CqqncFBeDA9xUT8-i9AE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

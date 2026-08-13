@@ -1,6 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { getDeviceId } from "../lib/deviceId";
-import { formatGroupLabel, Group } from "../lib/groups";
+import { formatGroupLabel, getCurrentIdentityId, Group } from "../lib/groups";
 import { supabase } from "../lib/supabaseClient";
 
 interface AddTaskFormProps {
@@ -130,9 +129,9 @@ export function AddTaskForm({
     setIsSubmitting(true);
 
     try {
-      const deviceId = assignedGroupId ? null : await getDeviceId();
+      const identityId = assignedGroupId ? null : await getCurrentIdentityId();
       const { error } = await supabase.from("tasks").insert({
-        owner_identity_id: deviceId,
+        owner_identity_id: identityId,
         group_id: assignedGroupId,
         title: title.trim(),
         notes: notes.trim() || null,

@@ -13,6 +13,13 @@ import {
   linkDeviceToIdentity,
 } from "../lib/groups";
 import { getDeviceId } from "../lib/deviceId";
+import {
+  isPushSupported,
+  requestNotificationPermission,
+  subscribeToPush,
+  unsubscribeFromPush,
+  getPushSubscriptionStatus,
+} from "../lib/push";
 
 interface GroupJoinProps {
   activeGroupId: string | null;
@@ -52,6 +59,16 @@ export function GroupJoin({
   const [isLinking, setIsLinking] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
   const [linkSuccess, setLinkSuccess] = useState<string | null>(null);
+
+  // Push Notification state
+  const [pushSupported, setPushSupported] = useState(false);
+  const [pushPermission, setPushPermission] = useState<NotificationPermission>(
+    "default",
+  );
+  const [isPushSubscribed, setIsPushSubscribed] = useState(false);
+  const [isManagingPush, setIsManagingPush] = useState(false);
+  const [pushError, setPushError] = useState<string | null>(null);
+  const [pushSuccess, setPushSuccess] = useState<string | null>(null);
 
   async function loadGroups() {
     setIsLoading(true);
@@ -110,6 +127,10 @@ export function GroupJoin({
   useEffect(() => {
     loadGroups();
   }, [activeGroupId, refreshKey]);
+
+  useEffect(() => {
+    checkPushStatus();
+  }, []);
 
   function updateActiveGroup(groupId: string | null) {
     setActiveGroupId(groupId);
@@ -268,6 +289,50 @@ export function GroupJoin({
     }
   }
 
+  async function checkPushStatus() {
+    if (!isPushSupported()) {
+      setPushSupported(false);
+      return;
+    }
+    setPushSupported(true);
+    setPushPermission(Notification.permission);
+    setIsPushSubscribed(await getPushSubscriptionStatus());
+  }
+
+  async function togglePushNotifications() {
+    if (!pushSupported) return;
+
+    setPushError(null);
+    setPushSuccess(null);
+    setIsManagingPush(true);
+
+    try {
+      if (isPushSubscribed) {
+        await unsubscribeFromPush();
+        setIsPushSubscribed(false);
+        setPushSuccess("Notifications disabled.");
+      } else {
+        if (Notification.permission !== "granted") {
+          const permission = await requestNotificationPermission();
+          if (permission !== "granted") {
+            throw new Error("Notification permission was denied.");
+          }
+        }
+        await subscribeToPush();
+        setIsPushSubscribed(true);
+        setPushSuccess("Notifications enabled!");
+      }
+    } catch (error) {
+      setPushError(
+        error instanceof Error
+          ? error.message
+          : "Failed to update notifications.",
+      );
+    } finally {
+      setIsManagingPush(false);
+    }
+  }
+
   return (
     <section className="section scope-panel">
       <div className="section-header">
@@ -398,6 +463,39 @@ export function GroupJoin({
         </label>
         {linkError ? <p className="error-text">{linkError}</p> : null}
         {linkSuccess && !isLinking ? <p className="muted-text">{linkSuccess}</p> : null}
+      </div>
+
+      {/* Push Notifications Section */}
+      <div className="form-grid">
+        <label className="field">
+          <span className="field-label">Web Push Notifications</span>
+          {pushSupported ? (
+            <>
+              <p className="muted-text">
+                {pushPermission === "granted"
+                  ? `Permission granted. ${isPushSubscribed ? "Subscribed to push." : "Not subscribed."}`
+                  : "Notification permission not granted."}
+              </p>
+              <button
+                disabled={isManagingPush}
+                type="button"
+                onClick={togglePushNotifications}
+              >
+                {isManagingPush
+                  ? "Working..."
+                  : isPushSubscribed
+                    ? "Disable notifications"
+                    : "Enable notifications"}
+              </button>
+            </>
+          ) : (
+            <p className="muted-text">
+              Push notifications are not supported in this browser.
+            </p>
+          )}
+          {pushError ? <p className="error-text">{pushError}</p> : null}
+          {pushSuccess ? <p className="muted-text">{pushSuccess}</p> : null}
+        </label>
       </div>
 
       {!isLoading && groups.length > 0 ? (

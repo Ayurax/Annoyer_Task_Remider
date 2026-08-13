@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { getDeviceId } from "../lib/deviceId";
-import { getMyGroups } from "../lib/groups";
+import { getMyGroups, getCurrentIdentityId } from "../lib/groups";
 import { supabase } from "../lib/supabaseClient";
 
 interface Task {
@@ -61,8 +61,8 @@ export function TaskList({
 
           query = query.eq("group_id", activeGroupId);
         } else {
-          const deviceId = await getDeviceId();
-          query = query.eq("owner_device_id", deviceId);
+          const identityId = await getCurrentIdentityId();
+          query = query.eq("owner_identity_id", identityId);
         }
 
         const { data, error } = await query;

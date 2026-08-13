@@ -3,8 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
-    // TODO: Apply com.google.gms.google-services after adding google-services.json.
-}
+    id("com.google.gms.google-services")}
 
 import java.util.Properties
 

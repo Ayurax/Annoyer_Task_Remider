@@ -65,17 +65,19 @@ class TaskReminderFirebaseMessagingService : FirebaseMessagingService() {
 
         val data = message.data
         val taskId = data["task_id"]
-        val title = data["title"]
+        val title = data["title"] ?: "Task Reminder"
         val dueAt = data["due_at"]
+        val nagCount = data["nag_count"]
 
-        if (title == null) {
-            return
-        }
-
-        showNotification(taskId, title, dueAt)
+        showNotification(taskId, title, dueAt, nagCount)
     }
 
-    private fun showNotification(taskId: String?, title: String, dueAt: String?) {
+    private fun showNotification(
+        taskId: String?,
+        title: String,
+        dueAt: String?,
+        nagCount: String?,
+    ) {
         val channelId = "task_reminders"
         val channelName = "Task Reminders"
 
@@ -86,37 +88,56 @@ class TaskReminderFirebaseMessagingService : FirebaseMessagingService() {
             val channel = NotificationChannel(
                 channelId,
                 channelName,
-                NotificationManager.IMPORTANCE_DEFAULT,
+                NotificationManager.IMPORTANCE_HIGH,
             )
+            channel.enableVibration(true)
+            channel.enableLights(true)
             notificationManager.createNotificationChannel(channel)
         }
 
         val contentText = if (dueAt != null) "Due: $dueAt" else "You have a pending reminder"
+        val notificationTitle = if (nagCount != null && nagCount != "1") {
+            "$title (Nag #$nagCount)"
+        } else {
+            title
+        }
 
         val intent = Intent(this, com.example.taskreminder.MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            putExtra("task_id", taskId)
         }
+
+        val notificationId = taskId?.hashCode() ?: System.currentTimeMillis().toInt()
+
         val pendingIntent = PendingIntent.getActivity(
             this,
-            taskId?.hashCode() ?: 0,
+            notificationId,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
         val builder = NotificationCompat.Builder(this, channelId)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(title)
+            .setContentTitle(notificationTitle)
             .setStyle(
                 NotificationCompat.BigTextStyle()
-                    .bigText(if (dueAt != null) "$title — Due: $dueAt" else title),
+                    .bigText(
+                        buildString {
+                            append(notificationTitle)
+                            if (dueAt != null) {
+                                append("\nDue: $dueAt")
+                            }
+                        },
+                    ),
             )
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setContentText(contentText)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setDefaults(android.app.Notification.DEFAULT_VIBRATE or android.app.Notification.DEFAULT_SOUND)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
+            .setOngoing(false)
+            .setOnlyAlertOnce(false)
 
-        NotificationManagerCompat.from(this).notify(
-            taskId?.hashCode() ?: System.currentTimeMillis().toInt(),
-            builder.build(),
-        )
+        NotificationManagerCompat.from(this).notify(notificationId, builder.build())
     }
 }

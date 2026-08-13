@@ -24,28 +24,11 @@ class DeviceIdStore(private val context: Context) {
         initialized
         val existingId = dataStore.data.first()[DEVICE_ID_KEY]
         if (!existingId.isNullOrBlank()) {
+            SupabaseClientProvider.deviceId = existingId
             return existingId
         }
 
         val deviceId = UUID.randomUUID().toString()
-        val connection = SupabaseClientProvider.openConnection("devices", "POST")
-        try {
-            connection.doOutput = true
-            connection.setRequestProperty("Content-Type", "application/json")
-            connection.setRequestProperty("Prefer", "return=minimal")
-
-            OutputStreamWriter(connection.outputStream).use { writer ->
-                writer.write(JSONObject().put("id", deviceId).toString())
-            }
-
-            if (connection.responseCode !in 200..299) {
-                throw IllegalStateException(
-                    "Failed to create device identity: ${connection.responseCode} ${SupabaseClientProvider.readBody(connection)}",
-                )
-            }
-        } finally {
-            connection.disconnect()
-        }
         dataStore.edit { preferences ->
             preferences[DEVICE_ID_KEY] = deviceId
         }
@@ -58,11 +41,17 @@ class DeviceIdStore(private val context: Context) {
         // Check if we have a cached identity_id
         val cachedIdentityId = dataStore.data.first()[IDENTITY_ID_KEY]
         if (!cachedIdentityId.isNullOrBlank()) {
+            // Ensure x-device-id header is set for subsequent RLS queries
+            val deviceId = dataStore.data.first()[DEVICE_ID_KEY]
+            if (deviceId != null) {
+                SupabaseClientProvider.deviceId = deviceId
+            }
             return cachedIdentityId
         }
 
-        // Get device_id for RPC calls
+        // Get device_id and set header for subsequent RPC calls
         val deviceId = getDeviceId()
+        SupabaseClientProvider.deviceId = deviceId
 
         // Try to fetch existing identity for this device
         val identityResponse = fetchIdentityForDevice(deviceId)
@@ -73,14 +62,15 @@ class DeviceIdStore(private val context: Context) {
             identityResponse.lowercase() != "null") {
             // Strip surrounding quotes if present (e.g., if response is quoted JSON string)
             val cleanedId = identityResponse.trim()
-            if (cleanedId.startsWith('"') && cleanedId.endsWith('"') && cleanedId.length >= 2) {
-                return cleanedId.substring(1, cleanedId.length - 1)
+            val unquotedId = if (cleanedId.startsWith('"') && cleanedId.endsWith('"') && cleanedId.length >= 2) {
+                cleanedId.substring(1, cleanedId.length - 1)
+            } else {
+                cleanedId
             }
-            // Cache and return the identity_id
             dataStore.edit { preferences ->
-                preferences[IDENTITY_ID_KEY] = cleanedId
+                preferences[IDENTITY_ID_KEY] = unquotedId
             }
-            return cleanedId
+            return unquotedId
         }
 
         // No identity exists, create a new one
@@ -151,9 +141,4 @@ class DeviceIdStore(private val context: Context) {
         } finally {
             connection.disconnect()
         }
-    }
-
-    data class DeviceRecord(
-        val id: String,
-    )
-}
+    }}

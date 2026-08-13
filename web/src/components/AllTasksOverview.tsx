@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { getDeviceId } from "../lib/deviceId";
-import { formatGroupLabel, getMyGroups } from "../lib/groups";
+import { formatGroupLabel, getCurrentIdentityId, getMyGroups } from "../lib/groups";
 import { supabase } from "../lib/supabaseClient";
 
 interface Task {
@@ -41,7 +41,7 @@ export function AllTasksOverview({
       setErrorMessage(null);
 
       try {
-        const deviceId = await getDeviceId();
+        const identityId = await getCurrentIdentityId();
         const groups = await getMyGroups();
         const groupIds = groups.map((group) => group.id);
         const groupNameById = new Map(
@@ -53,7 +53,7 @@ export function AllTasksOverview({
           .select(
             "id,owner_identity_id,group_id,title,notes,due_at,nag_interval_minutes,status,completed_at",
           )
-          .eq("owner_identity_id", deviceId)
+          .eq("owner_identity_id", identityId)
           .eq("status", "pending");
 
         if (personalError) {

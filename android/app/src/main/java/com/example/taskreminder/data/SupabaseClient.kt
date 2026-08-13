@@ -5,6 +5,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 object SupabaseClientProvider {
+    var deviceId: String? = null
+
     val supabaseUrl: String by lazy {
         BuildConfig.SUPABASE_URL.trim().trimEnd('/')
     }
@@ -29,6 +31,9 @@ object SupabaseClientProvider {
         connection.setRequestProperty("apikey", supabaseAnonKey)
         connection.setRequestProperty("Authorization", "Bearer $supabaseAnonKey")
         connection.setRequestProperty("Accept", "application/json")
+        if (deviceId != null) {
+            connection.setRequestProperty("x-device-id", deviceId)
+        }
         return connection
     }
 

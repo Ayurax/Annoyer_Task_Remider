@@ -24,3 +24,6 @@ port = 54323
 
 [auth]
 enabled = false
+
+[functions.check-due-tasks]
+verify_jwt = false

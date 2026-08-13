@@ -1,0 +1,13 @@
+{
+  "imports": {
+    "npm:firebase-admin@12": "npm:firebase-admin@12",
+    "https://esm.sh/web-push@3.6.7": "https://esm.sh/web-push@3.6.7"
+  },
+  "compilerOptions": {
+    "allowImportingTsExtensions": false,
+    "module": "esnext",
+    "moduleResolution": "deno",
+    "strict": true,
+    "lib": ["dom", "dom.iterable", "esnext"]
+  }
+}
