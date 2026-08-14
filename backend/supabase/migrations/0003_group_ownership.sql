@@ -1,1 +1,0 @@
-ALTER TABLE groups ADD COLUMN owner_id uuid REFERENCES auth.users(id) ON DELETE CASCADE;
