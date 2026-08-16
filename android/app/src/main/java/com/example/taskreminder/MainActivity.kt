@@ -1,11 +1,17 @@
 package com.example.taskreminder
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -48,6 +54,8 @@ import androidx.compose.material3.TextFieldColors
 import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.Icon
 import com.example.taskreminder.ui.SettingsScreen
+import com.google.firebase.messaging.FirebaseMessaging
+import com.example.taskreminder.notifications.syncFcmTokenToSupabase
 import com.example.taskreminder.data.DeviceIdStore
 import com.example.taskreminder.data.Group
 import com.example.taskreminder.data.GroupRepository
@@ -59,10 +67,51 @@ import com.example.taskreminder.ui.TaskListScreen
 import com.example.taskreminder.ui.theme.TaskReminderTheme
 
 class MainActivity : ComponentActivity() {
+    private val requestNotificationPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
         enableEdgeToEdge()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS,
+            ) != PackageManager.PERMISSION_GRANTED) {
+            requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+
+        try {
+            Log.d("FCM", "Fetching FCM registration token started")
+            FirebaseMessaging.getInstance().token
+                .addOnCompleteListener { task ->
+                    if (task.isSuccessful) {
+                        val token = task.result
+                        val tokenPrefix = if (token != null && token.length >= 10) {
+                            token.substring(0, 10)
+                        } else {
+                            token
+                        }
+                        Log.d("FCM", "Fetching FCM registration token completed successfully. Token prefix: $tokenPrefix")
+                        lifecycleScope.launch(Dispatchers.IO) {
+                            try {
+                                Log.d("FCM", "sync started")
+                                syncFcmTokenToSupabase(this@MainActivity, token)
+                                Log.d("FCM", "sync completed")
+                            } catch (e: Exception) {
+                                Log.e("FCM", "Error syncing FCM token", e)
+                            }
+                        }
+                    } else {
+                        Log.w("FCM", "Fetching FCM registration token failed", task.exception)
+                    }
+                }
+        } catch (e: Exception) {
+            Log.e("FCM", "Exception occurred while fetching FCM token", e)
+        }
 
         val offlineSyncCoordinator = OfflineSyncCoordinator(this)
         lifecycleScope.launch(Dispatchers.IO) {

@@ -161,7 +161,7 @@ fun SettingsScreen(
     // Load identity ID, device ID, and quiet hours on first composition
     if (!initialized) {
         initialized = true
-        coroutineScope.launch {
+        coroutineScope.launch(Dispatchers.IO) {
             try {
                 val identityId = deviceIdStore.getIdentityId()
                 val deviceId = deviceIdStore.getDeviceId()

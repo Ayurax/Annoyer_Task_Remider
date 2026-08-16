@@ -22,42 +22,9 @@ import java.io.OutputStreamWriter
 
 class TaskReminderFirebaseMessagingService : FirebaseMessagingService() {
 
-    private val deviceIdStore by lazy { DeviceIdStore(this) }
-
     override fun onNewToken(token: String) {
         super.onNewToken(token)
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val deviceId = deviceIdStore.getDeviceId()
-                val payload = JSONObject().apply {
-                    put("fcm_token", token)
-                }
-
-                val connection = SupabaseClientProvider.openConnection(
-                    "devices?id=eq.$deviceId", "PATCH"
-                )
-                try {
-                    connection.doOutput = true
-                    connection.setRequestProperty("Content-Type", "application/json")
-                    connection.setRequestProperty("Prefer", "return=minimal")
-
-                    OutputStreamWriter(connection.outputStream).use { writer ->
-                        writer.write(payload.toString())
-                    }
-
-                    if (connection.responseCode !in 200..299) {
-                        Log.e(
-                            "FCM",
-                            "Failed to update FCM token: ${connection.responseCode} ${SupabaseClientProvider.readBody(connection)}",
-                        )
-                    }
-                } finally {
-                    connection.disconnect()
-                }
-            } catch (e: Exception) {
-                Log.e("FCM", "Error syncing FCM token", e)
-            }
-        }
+        syncFcmTokenToSupabase(this, token)
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
@@ -139,5 +106,42 @@ class TaskReminderFirebaseMessagingService : FirebaseMessagingService() {
             .setOnlyAlertOnce(false)
 
         NotificationManagerCompat.from(this).notify(notificationId, builder.build())
+    }
+}
+
+fun syncFcmTokenToSupabase(context: Context, token: String) {
+    val deviceIdStore = DeviceIdStore(context)
+    CoroutineScope(Dispatchers.IO).launch {
+        try {
+            val deviceId = deviceIdStore.getDeviceId()
+            Log.d("FCM", "Using deviceId: $deviceId for FCM token update")
+            Log.d("FCM", "SupabaseClientProvider.deviceId at PATCH time: ${SupabaseClientProvider.deviceId}")
+            val payload = JSONObject().apply {
+                put("fcm_token", token)
+            }
+
+            val connection = SupabaseClientProvider.openConnection(
+                "devices?id=eq.$deviceId", "PATCH"
+            )
+            try {
+                connection.doOutput = true
+                connection.setRequestProperty("Content-Type", "application/json")
+                connection.setRequestProperty("Prefer", "return=minimal")
+
+                OutputStreamWriter(connection.outputStream).use { writer ->
+                    writer.write(payload.toString())
+                }
+
+                Log.d("FCM", "FCM token update response code: ${connection.responseCode}")
+                if (connection.responseCode !in 200..299) {
+                    val responseBody = SupabaseClientProvider.readBody(connection)
+                    Log.w("FCM", "Failed to update FCM token: ${connection.responseCode} $responseBody")
+                }
+            } finally {
+                connection.disconnect()
+            }
+        } catch (e: Exception) {
+            Log.e("FCM", "Error syncing FCM token", e)
+        }
     }
 }
